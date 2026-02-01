@@ -93,6 +93,20 @@ $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .delete-btn:hover {
             background-color: #da190b;
         }
+        .edit-btn {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .edit-btn:hover {
+            background-color: #0b7dda;
+        }
         .empty-message {
             text-align: center;
             color: #999;
@@ -124,6 +138,8 @@ $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <li class="todo-item">
                     <div class="task"><?php echo $todo['task']; ?></div>
                     <div class="date"><?php echo $todo['created_at']; ?></div>
+                    <!-- 編集ボタン（新規追加） -->
+                    <a href="edit_todo.php?id=<?php echo $todo['id']; ?>" class="edit-btn">編集</a>
                     <form method="POST" action="delete_todo.php" style="margin: 0;">
                         <input type="hidden" name="id" value="<?php echo $todo['id']; ?>">
                         <button type="submit" class="delete-btn" onclick="return confirm('本当に削除しますか？')">削除</button>
