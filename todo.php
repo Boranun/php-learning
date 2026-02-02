@@ -1,6 +1,30 @@
 <?php
+
 // データベース接続
 require_once 'db.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id']) && !isset($_POST['add'])) {
+    $id = $_POST['id'];
+    
+    // 現在の状態を取得
+    $stmt = $pdo->prepare("SELECT is_completed FROM todos WHERE id = :id");
+    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+    $stmt->execute();
+    $todo = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // 状態を反転（0→1、1→0）
+    $new_status = $todo['is_completed'] ? 0 : 1;
+    
+    // データベースを更新
+    $stmt = $pdo->prepare("UPDATE todos SET is_completed = :status WHERE id = :id");
+    $stmt->bindParam(':status', $new_status, PDO::PARAM_INT);
+    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+    $stmt->execute();
+    
+    // リダイレクト
+    header('Location: todo.php');
+    exit;
+}
 
 // タスク追加処理
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add'])) {
@@ -74,6 +98,20 @@ $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
             justify-content: space-between;
             align-items: center;
         }
+        .todo-item.completed {
+            background-color: #f0f0f0;
+            border-left-color: #999;
+        }
+        .todo-item.completed .task {
+            text-decoration: line-through;
+            color: #999;
+        }
+        .checkbox {
+            margin-right: 15px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
         .todo-item .task {
             flex: 1;
         }
@@ -135,7 +173,17 @@ $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <?php else: ?>
         <ul class="todo-list">
             <?php foreach ($todos as $todo): ?>
-                <li class="todo-item">
+                <li class="todo-item <?php echo $todo['is_completed'] ? 'completed' : ''; ?>">
+                    
+                    <!-- チェックボックス -->
+                    <form method="POST" style="margin: 0;">
+                        <input type="hidden" name="id" value="<?php echo $todo['id']; ?>">
+                        <input type="checkbox" 
+                            name="toggle" 
+                            class="checkbox"
+                            <?php echo $todo['is_completed'] ? 'checked' : ''; ?>
+                            onchange="this.form.submit()">
+                    </form>
                     <div class="task"><?php echo $todo['task']; ?></div>
                     <div class="date"><?php echo $todo['created_at']; ?></div>
                     <!-- 編集ボタン（新規追加） -->
