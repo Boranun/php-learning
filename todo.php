@@ -29,14 +29,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id']) && !isset($_POS
 // タスク追加処理
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add'])) {
     $task = trim($_POST['task']);
+    $priority = $_POST['priority']; 
     
     if (!empty($task)) {
         // XSS対策
         $task = htmlspecialchars($task, ENT_QUOTES, 'UTF-8');
         
-        // データベースに挿入（INSERT）
-        $stmt = $pdo->prepare("INSERT INTO todos (task) VALUES (:task)");
+        // データベースに挿入（INSERT）← priorityを追加
+        $stmt = $pdo->prepare("INSERT INTO todos (task, priority) VALUES (:task, :priority)");
         $stmt->bindParam(':task', $task);
+        $stmt->bindParam(':priority', $priority);  // ← 追加
         $stmt->execute();
         
         // リダイレクト（PRGパターン）
@@ -46,7 +48,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add'])) {
 }
 
 // タスク一覧を取得（SELECT）
-$stmt = $pdo->query("SELECT * FROM todos ORDER BY created_at DESC");
+// GETパラメータで表示モードを判定（デフォルトは完了済みを非表示）
+$show_completed = isset($_GET['show']) && $_GET['show'] === 'completed';
+
+if ($show_completed) {
+    // 全て表示
+    $stmt = $pdo->query("SELECT * FROM todos ORDER BY created_at DESC");
+} else {
+    // 未完了のみ表示
+    $stmt = $pdo->query("SELECT * FROM todos WHERE is_completed = 0 ORDER BY created_at DESC");
+}
+
 $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
@@ -69,10 +81,17 @@ $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
             margin-bottom: 30px;
         }
         .add-form input[type="text"] {
-            width: 70%;
+            width: 55%;
             padding: 10px;
             font-size: 16px;
             border: 1px solid #ddd;
+        }
+        .add-form select {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            margin-left: 5px;
+            cursor: pointer;
         }
         .add-form button {
             padding: 10px 20px;
@@ -150,6 +169,41 @@ $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
             color: #999;
             padding: 40px;
         }
+        .filter-btn {
+            display: inline-block;
+            padding: 8px 15px;
+            background-color: #2196F3;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .filter-btn:hover {
+            background-color: #0b7dda;
+        }
+        .priority-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .priority-high {
+            background-color: #ffebee;
+            color: #c62828;
+            border-left-color: #c62828 !important;
+        }
+        .priority-medium {
+            background-color: #fff3e0;
+            color: #ef6c00;
+            border-left-color: #ef6c00 !important;
+        }
+        .priority-low {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border-left-color: #2e7d32 !important;
+        }
     </style>
 </head>
 <body>
@@ -159,6 +213,11 @@ $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="add-form">
         <form method="POST">
             <input type="text" name="task" placeholder="新しいタスクを入力..." required>
+            <select name="priority">
+                <option value="high">🔴 高</option>
+                <option value="medium" selected>🟡 中</option>
+                <option value="low">🟢 低</option>
+            </select>
             <button type="submit" name="add">追加</button>
         </form>
     </div>
@@ -166,6 +225,14 @@ $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <!-- タスク一覧 -->
     <h2>タスク一覧（<?php echo count($todos); ?>件）</h2>
     
+    <div style="margin-bottom: 15px;">
+        <?php if ($show_completed): ?>
+            <a href="todo.php" class="filter-btn">✓ 未完了のみ表示</a>
+        <?php else: ?>
+            <a href="todo.php?show=completed" class="filter-btn">✓ 完了済みも表示</a>
+        <?php endif; ?>
+    </div>
+
     <?php if (empty($todos)): ?>
         <div class="empty-message">
             <p>タスクがありません。<br>新しいタスクを追加してください。</p>
@@ -173,7 +240,7 @@ $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <?php else: ?>
         <ul class="todo-list">
             <?php foreach ($todos as $todo): ?>
-                <li class="todo-item <?php echo $todo['is_completed'] ? 'completed' : ''; ?>">
+                <li class="todo-item priority-<?php echo $todo['priority']; ?> <?php echo $todo['is_completed'] ? 'completed' : ''; ?>">
                     
                     <!-- チェックボックス -->
                     <form method="POST" style="margin: 0;">
@@ -184,7 +251,16 @@ $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <?php echo $todo['is_completed'] ? 'checked' : ''; ?>
                             onchange="this.form.submit()">
                     </form>
-                    <div class="task"><?php echo $todo['task']; ?></div>
+                    <div class="task">
+                        <?php echo $todo['task']; ?>
+                        <span class="priority-badge">
+                            <?php 
+                            if ($todo['priority'] === 'high') echo '🔴 高';
+                            elseif ($todo['priority'] === 'medium') echo '🟡 中';
+                            else echo '🟢 低';
+                            ?>
+                        </span>
+                    </div>
                     <div class="date"><?php echo $todo['created_at']; ?></div>
                     <!-- 編集ボタン（新規追加） -->
                     <a href="edit_todo.php?id=<?php echo $todo['id']; ?>" class="edit-btn">編集</a>
