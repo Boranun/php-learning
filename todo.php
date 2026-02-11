@@ -47,16 +47,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add'])) {
     }
 }
 
+// 検索キーワードを取得
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+
 // タスク一覧を取得（SELECT）
-// GETパラメータで表示モードを判定（デフォルトは完了済みを非表示）
 $show_completed = isset($_GET['show']) && $_GET['show'] === 'completed';
 
-if ($show_completed) {
-    // 全て表示
-    $stmt = $pdo->query("SELECT * FROM todos ORDER BY created_at DESC");
+if ($search !== '') {
+    // 検索あり
+    if ($show_completed) {
+        $stmt = $pdo->prepare("SELECT * FROM todos WHERE task LIKE :search ORDER BY created_at DESC");
+    } else {
+        $stmt = $pdo->prepare("SELECT * FROM todos WHERE task LIKE :search AND is_completed = 0 ORDER BY created_at DESC");
+    }
+    $searchParam = '%' . $search . '%';
+    $stmt->bindParam(':search', $searchParam);
+    $stmt->execute();
 } else {
-    // 未完了のみ表示
-    $stmt = $pdo->query("SELECT * FROM todos WHERE is_completed = 0 ORDER BY created_at DESC");
+    // 検索なし
+    if ($show_completed) {
+        $stmt = $pdo->query("SELECT * FROM todos ORDER BY created_at DESC");
+    } else {
+        $stmt = $pdo->query("SELECT * FROM todos WHERE is_completed = 0 ORDER BY created_at DESC");
+    }
 }
 
 $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -204,6 +217,45 @@ $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
             color: #2e7d32;
             border-left-color: #2e7d32 !important;
         }
+        .search-form {
+            margin-bottom: 20px;
+        }
+        .search-form input[type="text"] {
+            width: 60%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+        }
+        .search-btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #607D8B;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-left: 5px;
+        }
+        .search-btn:hover {
+            background-color: #455A64;
+        }
+        .clear-btn {
+            padding: 10px 15px;
+            font-size: 16px;
+            background-color: #999;
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+            margin-left: 5px;
+        }
+        .clear-btn:hover {
+            background-color: #777;
+        }
+        .search-keyword {
+            font-size: 14px;
+            color: #607D8B;
+            font-weight: normal;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -221,9 +273,27 @@ $todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <button type="submit" name="add">追加</button>
         </form>
     </div>
+    <!-- 検索フォーム -->
+    <div class="search-form">
+        <form method="GET">
+            <input type="text" 
+                name="search" 
+                placeholder="タスクを検索..." 
+                value="<?php echo htmlspecialchars($search, ENT_QUOTES, 'UTF-8'); ?>">
+            <button type="submit" class="search-btn">🔍 検索</button>
+            <?php if ($search !== ''): ?>
+                <a href="todo.php" class="clear-btn">✕ クリア</a>
+            <?php endif; ?>
+        </form>
+    </div>
     
     <!-- タスク一覧 -->
-    <h2>タスク一覧（<?php echo count($todos); ?>件）</h2>
+    <h2>
+        タスク一覧（<?php echo count($todos); ?>件）
+        <?php if ($search !== ''): ?>
+            <span class="search-keyword">「<?php echo htmlspecialchars($search, ENT_QUOTES, 'UTF-8'); ?>」の検索結果</span>
+        <?php endif; ?>
+    </h2>
     
     <div style="margin-bottom: 15px;">
         <?php if ($show_completed): ?>
